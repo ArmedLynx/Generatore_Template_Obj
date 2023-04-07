@@ -1,75 +1,43 @@
-import openpyxl
-from openpyxl.utils import get_column_letter
+from MyClass.Data import Data
+from MyClass.Data import CsvData
+from MyClass.Template import Template
 
 from os import mkdir
 from os.path import exists as path_exists
+from os.path import splitext as splitext
 
 import sys, getopt
 
-
-class Template():
-    def __init__(self, template):
-        self.template = template
-        # Copio il file di testo in una stringa
-        file = open(template, "rt")
-        self.data = file.read()
-        file.close()
-
-    def Replace(self, tag, valore): # Sostituisce la stringa "tag" con la stringa "valore"
-        self.data = self.data.replace(tag, valore)
-    
-    def Save(self, nome, out_dir="./"): # Salva il file come "nome" nel percorso "out_dir"
-        outF = open(out_dir+"/"+nome, "w+")
-        outF.write(self.data)
-        outF.close()
-
-class Data():
-    def __init__(self, data):
-        self.data = data
-        # Apro il foglio di lavoro
-        wb=openpyxl.load_workbook(self.data)
-        self.sheet = wb.active
-        # Ottengo una lista contenente le colonne utilizzate (Es.: ["A","B","C"])
-        self.cols = [get_column_letter(c) for c in range(2, 1+len(tuple(self.sheet.columns)))]
-    
-    def GetFileName(self, riga): # Restituisce il filename contenuto nella cella alla riga "riga"
-        return self.sheet["A"+str(riga)].value
-    
-    def GetFilenames(self): # Restitusce una stringa contenente tutti i filename ordinati
-        names = [self.sheet["A"+str(i)].value for i in range(2, 1+len(tuple(self.sheet.rows)))]
-        return names
-    
-    def GetTag(self, colonna): # Restituisce il tag contenuto nella cella alla colonna "colonna"
-        return self.sheet[colonna+"1"].value
-    
-    def GetTags(self): # Restituisce una stringa contenente tutti i tag ordinati
-        tags = [self.sheet[i+"1"].value for i in self.cols]
-        return tags
-    
-    def GetValue(self, coord): # Restituisce il contenuto di una cella date le coordinate nel formato "A1"
-        return self.sheet[coord].value
-    
-    def GetCell(self, file, tag): # Restituisce le coordinate della cella con colonna corrispondente a quella del tag e riga corrispondente a quella del filename
-        col = self.cols[self.GetTags().index(tag)]
-        row = self.GetFilenames().index(file)+2
-        return col+str(row)
-        
+def ApriData(path):
+    # Recupero l'estensione del file data
+    file_name, file_extension = splitext(path)
+    if file_extension == ".csv" or file_extension == ".CSV":
+        #Creo un oggetto contenente il file csv
+        return CsvData(path), "csv"
+    elif file_extension == ".xlsx" or file_extension == ".XLSX":
+        # Creo un oggetto contenente il folgio di lavoro xlsx
+        return Data(path), "xlsx"
+    else:
+        print("# ERR: Formato file data non supportato")
+        raise SystemExit
 
 def main(argv):
-    opts, args = getopt.getopt(argv, "t:d:o:Fh") # Eseguo il parsing della lista di argomenti per ottenere una lista di tuple (opzione, argomento)
+    opts, args = getopt.getopt(argv, "t:d:o:FAh") # Eseguo il parsing della lista di argomenti per ottenere una lista di tuple (opzione, argomento)
 
     aiuto = '''
         -t <Path>\tPercorso per il file template
         -d <Path>\tPercorso per il file data
         -o <Path>\tPercorso per la cartella di output
         -F\tForza la riscrittura dei file di configurazione già creati
+        -A\tConcatena l'output nello stesso file. Ignora \"-F\" se presente
         -h\tAiuto
         '''
     # Assegno alle variabili il valore di default
     template_file = "./template.txt"
-    data_file = "./data.xlsx"
+    data_file = "./data.csv"
     out_path = "./outputs"
     overwrite = False
+    append = False
 
     # Assegno alle variabili il valore passato da cmd
     for opt, arg in opts:
@@ -81,6 +49,8 @@ def main(argv):
             out_path = arg
         elif opt == "-F":
             overwrite = True
+        elif opt == "-A":
+            append =True
         elif opt == "-h":
             print(aiuto)
             return
@@ -89,15 +59,20 @@ def main(argv):
 
     # Se la cartella di output non esiste la creo
     if path_exists(out_path) == False:
-        mkdir(out_path)
         print(": Creo la cartella di output\n|")
-    # Creo un oggetto contenente il folgio di lavoro xlsx
-    xls = Data(data_file)
-    print(": Leggo il file Excel\n|")
+        mkdir(out_path)
+    
+    # Verifico se il formato del file Data è supportato
+    print(": Verifico il formato del file data")
+    xls, Formato = ApriData(data_file)
+    print(":- Ho aperto il file "+Formato+"\n|")
+    
     # Eseguo un ciclo sulla lista contente i filename
-    for file in xls.GetFilenames():
+    for file in xls.GetFileNames():
+        # if append == True:
+        #     print("!!!devo concatenare!!!")
         # Se il flag overwrite è False e il file esiste non faccio nulla altrimenti creo il file configurazione
-        if overwrite == False and path_exists(out_path+"/"+file+".txt") == True:
+        if overwrite == append == False and path_exists(out_path+"/"+file+".txt") == True:
             print(": Il file "+file+".txt è già presente")
         else:
             # Creo un oggetto contenente il template
@@ -107,13 +82,31 @@ def main(argv):
             for tag in xls.GetTags():
                 # Sostituisco il tag con il contenuto della cella alle coordinate corrispondenti al file e al tag
                 conf.Replace(tag, xls.GetValue(xls.GetCell(file, tag)))
-                print(":-- Sostituisco "+tag+" con "+xls.GetValue(xls.GetCell(file, tag)))
+                print(":-- Sostituisco "+tag+" con "+str(xls.GetValue(xls.GetCell(file, tag))))
             # Salvo il file di configurazione
-            conf.Save(file+".txt", out_path)
+            if append:
+                conf.Append(file+".txt", out_path)
+            else:
+                conf.Save(file+".txt", out_path)
             print(":- Salvo il file di cofigurazione "+file+"\n|")
     
     print(": Ho terminato la preparazione delle configurazioni")
     
+# def test():
+#     xls = CsvData(r'C:\Users\lspreafico.MATICMINDIT\Desktop\Cartel1.csv')
+#     print(xls.GetFileNames())
+#     for i in range (1, 3):
+#         print(xls.GetFileName(i))
+#     print(xls.GetTags())
+#     for i in range (1, 4):
+#         print(xls.GetTag(i))
+#     print(xls.GetValue("B2"))
+#     print(xls.GetValue("C3"))
+#     print(xls.GetCell("pippo", "<NET>"))
+#     print(xls.GetCell("pluto", "<HOST>"))
+#     print(xls.GetValue(xls.GetCell("pippo", "<NET>")))
+#     print(xls.GetValue(xls.GetCell("pluto", "<HOST>")))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+    # test()
