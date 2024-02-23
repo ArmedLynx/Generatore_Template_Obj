@@ -69,8 +69,6 @@ def main(argv):
     
     # Eseguo un ciclo sulla lista contente i filename
     for file in xls.GetFileNames():
-        # if append == True:
-        #     print("!!!devo concatenare!!!")
         # Se il flag overwrite è False e il file esiste non faccio nulla altrimenti creo il file configurazione
         if overwrite == append == False and path_exists(out_path+"/"+file+".txt") == True:
             print(": Il file "+file+".txt è già presente")
@@ -91,23 +89,6 @@ def main(argv):
             print(":- Salvo il file di cofigurazione "+file+"\n|")
     
     print(": Ho terminato la preparazione delle configurazioni")
-    
-# def test():
-#     xls = CsvData(r'C:\Users\lspreafico.MATICMINDIT\Desktop\Cartel1.csv')
-#     print(xls.GetFileNames())
-#     for i in range (1, 3):
-#         print(xls.GetFileName(i))
-#     print(xls.GetTags())
-#     for i in range (1, 4):
-#         print(xls.GetTag(i))
-#     print(xls.GetValue("B2"))
-#     print(xls.GetValue("C3"))
-#     print(xls.GetCell("pippo", "<NET>"))
-#     print(xls.GetCell("pluto", "<HOST>"))
-#     print(xls.GetValue(xls.GetCell("pippo", "<NET>")))
-#     print(xls.GetValue(xls.GetCell("pluto", "<HOST>")))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-    # test()
-    # test()
